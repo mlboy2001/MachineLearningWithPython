@@ -1,2 +1,5 @@
 # MachineLearningWithPython
-Practice machine learning in python, referencing Hands on Machine Learning with Scikit Learn and Tensorflow
+Practice machine learning in python, referencing the book "Hands on Machine Learning with Scikit Learn and Tensorflow"
+
+![Book](https://github.com/mlboy2001/JS-Calculator/blob/master/Calculator.PNG?raw=true "book")
+
