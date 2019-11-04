@@ -13,6 +13,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import LabelBinarizer
 from sklearn.metrics import mean_squared_error
 from sklearn.pipeline import FeatureUnion
+from sklearn.model_selection import cross_val_score
 
 # dataset url
 DOWNLOAD_ROOT = "https://raw.githubusercontent.com/ageron/handson-ml/master/"
@@ -73,6 +74,11 @@ def split_train_test(data, test_ratio):
     test_indices = shuffled_indices[:test_set_size]
     train_indices = shuffled_indices[test_set_size:]
     return data.iloc[train_indices], data.iloc[test_indices]
+
+def display_scores(scores):
+    print("Scores:", scores)
+    print("Mean:", scores.mean())
+    print("Standard deviation:", scores.std())
 
 # Below are options are switches for the output
 ifFetchData = False
@@ -142,17 +148,66 @@ full_pipeline = FeatureUnion(transformer_list=[
 ])
 
 housing_prepared = full_pipeline.fit_transform(housing)
-lin_reg = LinearRegression()
-lin_reg.fit(housing_prepared, housing_labels)
 
 some_data = housing.iloc[:5]
 some_labels = housing_labels.iloc[:5]
 some_data_prepared = full_pipeline.transform(some_data)
 
-print("Predictions:", lin_reg.predict(some_data_prepared))
-print("Labels:", list(some_labels))
-
+# Train a linear regression model
+lin_reg = LinearRegression()
+lin_reg.fit(housing_prepared, housing_labels)
+print("Linear Regression Model Predictions:", lin_reg.predict(some_data_prepared))
+print("Actual Labels:", list(some_labels))
 housing_predictions = lin_reg.predict(housing_prepared)
 lin_mse = mean_squared_error(housing_labels, housing_predictions)
 lin_rmse = np.sqrt(lin_mse)
-print(lin_rmse)
+print("Linear Regression Model RMSE:", lin_rmse)
+
+lin_scores = cross_val_score(lin_reg, housing_prepared, housing_labels,
+scoring="neg_mean_squared_error", cv=10)
+lin_rmse_scores = np.sqrt(-lin_scores)
+display_scores(lin_rmse_scores)
+
+# Train a DecisionTreeRegressor
+from sklearn.tree import DecisionTreeRegressor
+tree_reg = DecisionTreeRegressor()
+tree_reg.fit(housing_prepared, housing_labels)
+scores = cross_val_score(tree_reg, housing_prepared, housing_labels,
+scoring="neg_mean_squared_error", cv=10)
+tree_rmse_scores = np.sqrt(-scores)
+print("DecisionTreeRegressor Model cross validation result:")
+display_scores(tree_rmse_scores)
+
+# Train a RandomForestRegressor model
+from sklearn.ensemble import RandomForestRegressor
+forest_reg = RandomForestRegressor()
+forest_reg.fit(housing_prepared, housing_labels)
+scores = cross_val_score(tree_reg, housing_prepared, housing_labels,
+scoring="neg_mean_squared_error", cv=10)
+tree_rmse_scores = np.sqrt(-scores)
+print("RandomForestRegressor Model cross validation result:")
+display_scores(tree_rmse_scores)
+
+# Fine tune model using GridSerach
+from sklearn.model_selection import GridSearchCV
+param_grid = [
+{'n_estimators': [3, 10, 30], 'max_features': [2, 4, 6, 8]},
+{'bootstrap': [False], 'n_estimators': [3, 10], 'max_features': [2, 3, 4]},
+]
+forest_reg = RandomForestRegressor()
+grid_search = GridSearchCV(forest_reg, param_grid, cv=5,
+scoring='neg_mean_squared_error')
+grid_search.fit(housing_prepared, housing_labels)
+cvres = grid_search.cv_results_
+print("Find tune RandomForestRegressor results:")
+for mean_score, params in zip(cvres["mean_test_score"], cvres["params"]):
+    print(np.sqrt(-mean_score), params)
+
+final_model = grid_search.best_estimator_
+X_test = test_set.drop("median_house_value", axis=1)
+y_test = test_set["median_house_value"].copy()
+X_test_prepared = full_pipeline.transform(X_test)
+final_predictions = final_model.predict(X_test_prepared)
+final_mse = mean_squared_error(y_test, final_predictions)
+final_rmse = np.sqrt(final_mse)
+print("Final Model RMSE(on test set):", final_rmse)
